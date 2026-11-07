@@ -2,7 +2,7 @@ import { short } from '../format.js';
 import type { ChainSignal } from '../state.js';
 import { txFinding, type AttackStage, type DetectorContext, type Finding, type FindingAnchor } from './types.js';
 
-const ATTACK_CHAIN_ID = 'attack-chain';
+export const ATTACK_CHAIN_ID = 'attack-chain';
 const WINDOW_SECONDS = 24 * 3_600;
 const STAGE_TEXT: Record<AttackStage, string> = { control: 'control changed', risk: 'risk settings changed', drain: 'funds moved out' };
 const STAGE_ORDER: AttackStage[] = ['control', 'risk', 'drain'];

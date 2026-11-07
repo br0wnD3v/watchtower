@@ -75,7 +75,7 @@ Discovery uses small, budgeted scans to work out what to watch ([`src/discover/i
 - **Finding admin instructions:** names and signer roles in the IDL pre-select likely admin-only instructions in Setup ([`src/discover/idl.ts`](../src/discover/idl.ts)).
 - **Reading config accounts:** the IDL's account layouts let Watchtower decode admin fields like `GlobalConfig.admin` and diff settings over time.
 - **Spotting new IDLs:** the `idl-change` detector polls for new versions and flags newly added admin-looking instructions ([`src/idlWatch.ts`](../src/idlWatch.ts)).
-- **Replaying the past correctly:** `replay` loads the IDL that was live when the window started, not today's.
+- **Replaying the past correctly:** `replay` loads the IDL that was live when the window started, not today's, and reports each version activated inside the window. A window given as dates is converted to slots from block times, since slot duration drifts over months.
 
 ## Parsed Streams: the same decoded transactions, live
 

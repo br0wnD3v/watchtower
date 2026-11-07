@@ -83,7 +83,7 @@ The dashboard binds to `127.0.0.1` by default. To share it with your team, run t
 - **Live alert times:** Parsed Streams does not carry `blockTime`, so live alerts show the slot.
 - **Proposals:** a Squads v4 proposal written through a transaction buffer (`vaultTransactionCreateFromBuffer`, used for large transactions such as upgrades) is decoded only when Watchtower saw the whole buffer being written, which it checks against the hash Squads stores. Approvals are linked to a v4 proposal only when `proposalCreate` ran in the same transaction that created it, as the Squads app does.
 - **Treasury thresholds:** these are raw token amounts, not USD values.
-- **Config accounts:** fields are read only up to the first one whose offset differs between Borsh and zero-copy layouts, and replay cannot diff them, since past account states are not stored.
+- **Config accounts:** fields are read only up to the first one whose offset differs between Borsh and zero-copy layouts, and replay cannot diff them, since past account states are not stored. Replay's detector coverage lists `config-change` as live only.
 
 ## Disclaimer
 

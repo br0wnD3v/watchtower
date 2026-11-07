@@ -29,6 +29,9 @@ const DETECTORS: Detector[] = [
     keyAuthority,
 ];
 
+/** The per-transaction detectors, in the order they run. */
+export const DETECTOR_IDS = DETECTORS.map((d) => d.id);
+
 /** High-or-above findings from these detectors get the `control` stage when they set none. */
 const CONTROL_DETECTORS = new Set([programDeployment.id, multisigChange.id, mintAuthority.id, nonceAuthority.id]);
 

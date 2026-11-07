@@ -110,11 +110,11 @@ Run `pnpm check` before handing work back. CI also runs Gitleaks on new commits 
 
 ## Replay
 
-`replay` uses on-chain state as it is today for discovery, but the IDL live at the window start. Keep it free of side effects: no sinks, a temporary state file, `silent` alert mode. The Drift exploit (2026-03-20 to 2026-04-02, `--no-program-scans`) is the reference case and should end with a `Possible attack in progress` finding at 2026-04-01 16:05 UTC. `pnpm replay:drift` runs it against mainnet and checks for that alert (`scripts/check-drift-replay.mjs`); `.github/workflows/replay.yml` runs it weekly (Mondays) with the `HELIUS_API_KEY` repository secret and opens an issue when it fails. Run it before merging changes to detectors, discovery or the Parsed Events adapter. It costs about 35 credits.
+`replay` uses on-chain state as it is today for discovery, but the IDL live at the window start, and reports IDL versions activated inside the window (`idlChangesBetween`). Date edges become slots through `RpcClient.slotAtTime`, which corrects with block times; never extrapolate today's `slotMs` over months, since slot duration drifts. Keep it free of side effects: no sinks, a temporary state file, `silent` alert mode. It ends with per-detector coverage (`detectorCoverage`): `ran`, `missing-data`, `nothing-to-watch` or `live-only`, derived from each scan plan's `detectors` and outcome, so keep plans' `detectors` lists accurate and add detectors that cannot run on history to `LIVE_ONLY`. The Drift exploit (2026-03-20 to 2026-04-02, `--no-program-scans`) is the reference case and should end with a `Possible attack in progress` finding at 2026-04-01 16:05 UTC. `pnpm replay:drift` runs it against mainnet and checks for that alert (`scripts/check-drift-replay.mjs`); `.github/workflows/replay.yml` runs it weekly (Mondays) with the `HELIUS_API_KEY` repository secret and opens an issue when it fails. Run it before merging changes to detectors, discovery or the Parsed Events adapter. It costs about 35 credits.
 
 ## Adding a detector
 
 1. Add `src/detectors/<name>.ts` exporting a `Detector`.
 2. Register it in `src/detectors/index.ts`.
-3. If it needs new data, extend the subscriptions and scan plans in `src/targets.ts`, keeping within the limits above, and list the detector in the covering plan's `detectors`.
+3. If it needs new data, extend the subscriptions and scan plans in `src/targets.ts`, keeping within the limits above. Either way, list the detector in the covering plan's `detectors` (replay coverage depends on it), or in `LIVE_ONLY` in `src/commands/replay.ts` if history can't feed it.
 4. Add tests in `test/detectors.test.ts` using `tx()` and `context()` from `test/helpers.ts`.

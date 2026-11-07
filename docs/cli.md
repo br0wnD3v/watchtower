@@ -140,4 +140,15 @@ pnpm dev replay --program dRiftyHA39MWEi3m9aunc5MzRF1JYuBsbn6VPcn33UH:Drift \
 
 `--no-program-scans` skips scanning the program's whole transaction stream, which for a busy program runs to millions of transactions a day. Admin calls are still found through each admin key's own, much shorter history. `--budget` caps each scan, and `--json` saves the findings.
 
-Discovery uses on-chain state as it is today: current multisig members, authorities and vault balances. Vault drains can't be replayed once a vault is empty.
+After the timeline, **Detector coverage** says what each detector covered, so a quiet replay isn't mistaken for a clean one:
+
+| Status             | Meaning                                                                                                                                                                                                                    |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ran`              | Every scan feeding it reached the end of the window.                                                                                                                                                                       |
+| `missing data`     | Part of its input wasn't scanned: a scan stopped at `--budget`, `--no-program-scans` skipped the program-wide admin scan, or a program has no known admin instructions. The reason names which.                            |
+| `nothing to watch` | Discovery found nothing of its kind, such as no mints or vaults.                                                                                                                                                           |
+| `live only`        | It can't run on past data: `config-change` needs past account states, which RPC doesn't serve; `nonce-authority` watches nonce instructions chain-wide; `build-verification` rechecks upgrades 30 minutes after they land. |
+
+`idl-change` runs in a replay too: it reports each IDL version Parsed Events activated inside the window. `--json` saves the coverage alongside the findings.
+
+Replay starts with no state from before the window, so the first signer of each admin instruction becomes its baseline, and a proposal created before the window shows without its contents when it executes. Discovery uses on-chain state as it is today: current multisig members, authorities and vault balances. Vault drains can't be replayed once a vault is empty, which shows as `nothing to watch` for `treasury-outflow`.

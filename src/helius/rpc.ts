@@ -19,6 +19,12 @@ export interface FungibleHolding {
 }
 
 const BASE64 = { encoding: 'base64', commitment: 'confirmed' } as const;
+/** Recent slots may not have a block time yet. */
+const SETTLED_SLOTS = 150;
+const MAX_SLOT_SEARCH_STEPS = 12;
+const MAX_SKIPPED_SLOTS = 50;
+/** RPC errors -32007 and -32009: a skipped slot, or one missing from storage. */
+const SKIPPED_SLOT = /skipped|missing/i;
 
 export class RpcClient {
     readonly #helius: HeliusClient;
@@ -55,6 +61,36 @@ export class RpcClient {
 
     async getSlot(): Promise<number> {
         return Number(await this.#helius.getSlot({ commitment: 'confirmed' }));
+    }
+
+    /**
+     * A slot whose block time is within a second of `time` (unix seconds), or the current slot for a time not yet reached.
+     * Slot times vary over months, so a guess from today's slot duration is corrected with block times (secant steps).
+     */
+    async slotAtTime(time: number): Promise<number> {
+        const [current, slotMs] = await Promise.all([this.getSlot(), this.getSlotDurationMs()]);
+        const now = Date.now() / 1000;
+        if (time >= now - (SETTLED_SLOTS * slotMs) / 1000) return current;
+        const guess = (from: { slot: number; time: number }, slotsPerSecond: number) =>
+            Math.min(current - SETTLED_SLOTS, Math.max(0, from.slot + Math.round((time - from.time) * slotsPerSecond)));
+        let a = await this.#timedSlot(guess({ slot: current, time: now }, 1000 / slotMs));
+        let b = await this.#timedSlot(guess(a, 1000 / slotMs));
+        for (let step = 0; Math.abs(b.time - time) > 1 && b.time !== a.time && step < MAX_SLOT_SEARCH_STEPS; step++) {
+            [a, b] = [b, await this.#timedSlot(guess(b, (b.slot - a.slot) / (b.time - a.time)))];
+        }
+        if (Math.abs(b.time - time) > 1) throw new Error(`no slot found within a second of ${new Date(time * 1000).toISOString()}`);
+        return b.slot;
+    }
+
+    /** The first produced slot at or after `slot`, with its block time. */
+    async #timedSlot(slot: number): Promise<{ slot: number; time: number }> {
+        for (let s = slot; ; s++) {
+            try {
+                return { slot: s, time: Number(await this.#helius.getBlockTime(BigInt(s))) };
+            } catch (error) {
+                if (s - slot >= MAX_SKIPPED_SLOTS || !SKIPPED_SLOT.test((error as Error).message)) throw error;
+            }
+        }
     }
 
     /** Includes native SOL with mint `SOL`. */

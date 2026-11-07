@@ -6,7 +6,7 @@ import type { ConfigField } from './discover/idl.js';
 import type { AlertMode } from './engine.js';
 import type { Runtime } from './runtime.js';
 
-const CONFIG_CHANGE_ID = 'config-change';
+export const CONFIG_CHANGE_ID = 'config-change';
 const MAX_ACCOUNTS_PER_CALL = 100;
 
 interface Rule {

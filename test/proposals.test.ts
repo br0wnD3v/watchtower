@@ -7,7 +7,7 @@ import { detect } from '../src/detectors/index.js';
 import { Engine } from '../src/engine.js';
 import { parseUnits } from '../src/format.js';
 import type { ParsedEventsClient } from '../src/helius/parsedEvents.js';
-import { checkIdlChanges } from '../src/idlWatch.js';
+import { checkIdlChanges, idlChangesBetween } from '../src/idlWatch.js';
 import { fromParsedEvents } from '../src/model.js';
 import type { ParsedTransactionResult } from 'helius-sdk/parsedEvents/types';
 import { context, KEYS, tx } from './helpers.js';
@@ -437,6 +437,22 @@ describe('idl-change', () => {
         const [finding] = ctx.state.pendingAlerts();
         expect(finding).toMatchObject({ severity: 'high', title: 'New admin instruction in IDL', signature: null });
         expect(finding!.description).toContain('added set_admin');
+    });
+
+    it('replays each IDL version published inside a window against the one before it', async () => {
+        const ctx = context();
+        const v1 = { instructions: [{ name: 'deposit', accounts: [] }] };
+        const v2 = { instructions: [...v1.instructions, { name: 'set_admin', accounts: [] }] };
+        const v3 = { instructions: [{ name: 'set_admin', accounts: [] }] };
+        const versions = [10, 20, 30, 40].map((slot) => ({ slot, sources: ['anchor'] }));
+        const events = fakeIdlEvents(versions, { 10: v1, 20: v2, 30: v3, 40: v3 });
+
+        const findings = await idlChangesBetween(events, ctx.targets, 10, 30);
+        expect(findings.map((f) => [f.slot, f.title])).toEqual([
+            [20, 'New admin instruction in IDL'],
+            [30, 'IDL updated'],
+        ]);
+        expect(findings[1]!.description).toContain('removed deposit');
     });
 });
 

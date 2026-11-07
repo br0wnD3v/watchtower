@@ -54,6 +54,7 @@ export const oracleChange: Detector = {
 
 1. Register it in [`src/detectors/index.ts`](src/detectors/index.ts).
 2. Add tests in [`test/detectors.test.ts`](test/detectors.test.ts) using the helpers in [`test/helpers.ts`](test/helpers.ts).
+3. Add its id to the `detectors` of the scan plan that finds its transactions (`scanPlans` in [`src/targets.ts`](src/targets.ts)), so `replay` reports whether it covered the window. If it needs state that history can't provide, add it to `LIVE_ONLY` in [`src/commands/replay.ts`](src/commands/replay.ts) instead.
 
 If a detector targets a real exploit, a `watchtower replay` of the exploit window is the most convincing test. The existing detectors are listed in [`docs/detectors.md`](docs/detectors.md).
 
