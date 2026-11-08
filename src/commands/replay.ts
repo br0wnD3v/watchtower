@@ -175,6 +175,7 @@ const NOTHING_TO_WATCH = new Map([
     ['multisig-change', 'No Squads multisig is watched.'],
     ['mint-authority', 'No mint is watched.'],
     ['privileged-instruction', 'No program is watched.'],
+    ['admin-key-behavior', "No admin key is known. List them under the program's adminKeys when its IDL doesn't reveal them."],
     [
         'treasury-outflow',
         "No treasury or vault is watched. Vaults are discovered from today's balances, so one emptied since the window is not found.",

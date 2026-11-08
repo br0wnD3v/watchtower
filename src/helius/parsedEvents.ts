@@ -26,6 +26,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_ATTEMPTS = 5;
 /** SDK errors read `Helius HTTP <status>: <message>`; also retries an archive that is behind a `minContextSlot`. */
 const RETRYABLE = /Helius HTTP (429|5\d\d)|Minimum context slot/;
+const NO_IDL = /Helius HTTP 404: .*no IDLs found/;
 
 export class ParsedEventsClient {
     readonly #helius: HeliusClient;
@@ -44,9 +45,14 @@ export class ParsedEventsClient {
         return retry('transaction-history', () => this.#helius.parsedEvents.getTransactionHistory({ commitment: 'confirmed', ...request }));
     }
 
-    /** Ascending by activation slot. */
-    listIdlVersions(programId: string): Promise<{ slot: number; sources: string[] }[]> {
-        return retry('idl', () => this.#getIdlEndpoint(programId));
+    /** Ascending by activation slot; empty for a program Parsed Events has no IDL for, which it answers with a 404. */
+    async listIdlVersions(programId: string): Promise<{ slot: number; sources: string[] }[]> {
+        try {
+            return await retry('idl', () => this.#getIdlEndpoint(programId));
+        } catch (error) {
+            if (NO_IDL.test((error as Error).message)) return [];
+            throw error;
+        }
     }
 
     getIdl(programId: string, activationSlot: number): Promise<unknown> {

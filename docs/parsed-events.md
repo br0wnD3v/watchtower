@@ -24,15 +24,15 @@ So detectors compare names and roles instead of parsing bytes, and the same dete
 
 Each watched address gets a scan plan with its own filter ([`scanPlans` in `src/targets.ts`](../src/targets.ts)):
 
-| What Watchtower watches | Address scanned           | `match` filter                                                                      | Finds                                                       |
-| ----------------------- | ------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Deployments             | The program's ProgramData | Upgradeable loader, `scope: address`                                                | Upgrades, authority changes, closes                         |
-| Admin calls by a key    | Each admin key            | The program, `scope: transaction`                                                   | Every call that key made to the program                     |
-| Admin calls by anyone   | The program               | The program plus the admin-only instruction names, `scope: transaction`             | Admin calls from any signer, including an unknown new admin |
-| Multisigs               | Each Squads multisig      | Squads v3 and v4, `scope: address`                                                  | Proposals, votes, executions, config changes                |
-| Mints                   | Each mint                 | SPL Token and Token-2022 by **discriminator** (`0x06`, `0x07`, …), `scope: address` | Authority changes, mints, freezes, extension updates        |
-| Treasuries              | Each treasury             | Watched mints, or System and both token programs                                    | Outflows                                                    |
-| Custody keys            | Each watched key          | Stake, System and token instructions by discriminator                               | Stake, token-account and delegate authority handoffs        |
+| What Watchtower watches | Address scanned           | `match` filter                                                                      | Finds                                                                           |
+| ----------------------- | ------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Deployments             | The program's ProgramData | Upgradeable loader, `scope: address`                                                | Upgrades, authority changes, closes                                             |
+| Admin calls by a key    | Each admin key            | The program, `scope: transaction`                                                   | Every call that key made to the program, which also builds its behavior profile |
+| Admin calls by anyone   | The program               | The program plus the admin-only instruction names, `scope: transaction`             | Admin calls from any signer, including an unknown new admin                     |
+| Multisigs               | Each Squads multisig      | Squads v3 and v4, `scope: address`                                                  | Proposals, votes, executions, config changes                                    |
+| Mints                   | Each mint                 | SPL Token and Token-2022 by **discriminator** (`0x06`, `0x07`, …), `scope: address` | Authority changes, mints, freezes, extension updates                            |
+| Treasuries              | Each treasury             | Watched mints, or System and both token programs                                    | Outflows                                                                        |
+| Custody keys            | Each watched key          | Stake, System and token instructions by discriminator                               | Stake, token-account and delegate authority handoffs                            |
 
 Two patterns are worth copying:
 
@@ -85,6 +85,7 @@ Discovery uses small, budgeted scans to work out what to watch ([`src/discover/i
 | ------------- | ------------------------------------------------------------------------------------------- |
 | `deployments` | Upgradeable loader, accounts include the programs and their ProgramData                     |
 | `admin`       | The program, its admin-only `instructionNames`, failed transactions included                |
+| `adminkeys`   | The program, accounts include its admin keys, so undecoded admin calls arrive too           |
 | `multisigs`   | Squads v3 and v4, accounts include the multisigs                                            |
 | `mints`       | SPL Token and Token-2022, authority and mint `instructionNames`, accounts include the mints |
 | `treasuries`  | Accounts include the treasuries                                                             |

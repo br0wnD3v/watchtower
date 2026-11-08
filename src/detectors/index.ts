@@ -1,4 +1,5 @@
 import { severityRank } from '../config.js';
+import { adminKeyBehavior } from './adminKeyBehavior.js';
 import { decodeTransactionBuffers } from '../discover/squads.js';
 import type { ParsedTx } from '../model.js';
 import { linkAttackStages } from './attackChain.js';
@@ -24,6 +25,7 @@ const DETECTORS: Detector[] = [
     multisigChange,
     mintAuthority,
     privilegedInstruction,
+    adminKeyBehavior,
     treasuryOutflow,
     nonceAuthority,
     keyAuthority,

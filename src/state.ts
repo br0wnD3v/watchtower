@@ -39,6 +39,17 @@ interface ProposalRecord {
     slot: number;
 }
 
+/** What an admin key's signed transactions on a program have looked like so far. */
+export interface AdminKeyProfile {
+    transactions: number;
+    /** Instruction keys from `instructionKey`. */
+    instructions: string[];
+    /** Fee payers, including the key itself, and co-signers. */
+    parties: string[];
+    /** Other programs called in the same transactions. */
+    programs: string[];
+}
+
 export interface ChainSignal {
     stage: AttackStage;
     findingId: string;
@@ -83,6 +94,8 @@ interface StateFile {
     /** Last decoded field values per config account. */
     /** Decoded config account fields and the slot they were read at. */
     configReads: Record<string, { slot: number; values: Record<string, string> }>;
+    /** Keyed by `programId:adminKey`. */
+    adminKeyProfiles: Record<string, AdminKeyProfile>;
 }
 
 const MAX_FINDINGS = 5_000;
@@ -90,6 +103,7 @@ const MAX_PENDING_CONFIG_TRANSACTIONS = 500;
 const MAX_PROPOSED_CHANGES = 500;
 const MAX_PROPOSALS = 1_000;
 const MAX_TRANSACTION_BUFFERS = 200;
+const MAX_PROFILE_ENTRIES = 500;
 
 export class StateStore {
     readonly #path: string;
@@ -275,6 +289,25 @@ export class StateStore {
         this.#dirty = true;
     }
 
+    /**
+     * Adds one transaction to the profile at `key` and returns the profile as it was before it, or `undefined` for the
+     * first. Each list keeps its first `MAX_PROFILE_ENTRIES` entries, so later additions stay reported as new.
+     */
+    recordAdminKeyUse(key: string, use: Omit<AdminKeyProfile, 'transactions'>): AdminKeyProfile | undefined {
+        const current = this.#state.adminKeyProfiles[key];
+        const before = current && structuredClone(current);
+        const profile = current ?? { transactions: 0, instructions: [], parties: [], programs: [] };
+        profile.transactions++;
+        for (const field of ['instructions', 'parties', 'programs'] as const) {
+            for (const entry of use[field]) {
+                if (!profile[field].includes(entry) && profile[field].length < MAX_PROFILE_ENTRIES) profile[field].push(entry);
+            }
+        }
+        this.#state.adminKeyProfiles[key] = profile;
+        this.#dirty = true;
+        return before;
+    }
+
     knownSigners(key: string): readonly string[] {
         return this.#state.knownSigners[key] ?? [];
     }
@@ -344,5 +377,6 @@ function emptyState(): StateFile {
         chainSignals: {},
         sweeps: {},
         configReads: {},
+        adminKeyProfiles: {},
     };
 }

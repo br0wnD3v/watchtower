@@ -17,7 +17,7 @@ Parsed Events uses the SDK's endpoint, `https://mainnet.helius-rpc.com/v1/parsed
 
 A Parsed Events scan costs 10 credits plus 1 for each 1,000 transactions scanned. Matched transactions returned in full also cost credits: in testing, a busy exchange wallet with 14,156 matches cost about 1,560 credits.
 
-- **Which addresses are scanned:** the program's ProgramData, each multisig, each mint, each treasury, and the program itself when admin instructions are configured. `report` also scans each privileged key's history for nonce accounts.
+- **Which addresses are scanned:** the program's ProgramData, each admin key, each multisig, each mint, each treasury, and the program itself when admin instructions are configured. `report` also scans each privileged key's history for nonce accounts.
 - **How long the histories are:** ProgramData and multisig histories are short and cost about 11 credits a run. Busy programs, mints and treasuries are long.
 - **Capping a run:** `backfill.maxScannedTransactions` caps each scan, and the report lists the credits each one used.
 - **First scans:** a first scan reads newest-first, so it covers the most recent history within the cap and then starts monitoring from the present.

@@ -103,7 +103,7 @@ export function buildTargets(config: Config, discovery: Discovery, state?: State
             programData: discovered?.programData ?? null,
             privilegedInstructions: new Set(program.privilegedInstructions.map(normalizeName)),
             instructionsByDiscriminator: new Map(Object.entries(discovered?.idl?.discriminators ?? {})),
-            adminKeys: discovered?.admins.map((a) => a.key) ?? [],
+            adminKeys: [...new Set([...program.adminKeys, ...(discovered?.admins.map((a) => a.key) ?? [])])],
         };
         targets.programs.set(program.id, watched);
         targets.groups.set(program.id, program.id);
@@ -114,6 +114,7 @@ export function buildTargets(config: Config, discovery: Discovery, state?: State
             if (admin.multisig) addMultisig(admin.multisig, `${label} admin multisig`, program.id);
             addKey(admin.key, `Admin (${admin.role}) of ${label}`, program.id, label);
         }
+        for (const key of program.adminKeys) addKey(key, `Admin of ${label}`, program.id, label);
         if (program.watchVaults) {
             for (const vault of discovered?.vaults ?? []) {
                 targets.treasuries.set(vault.authority, vaultTreasury(vault, `${label} vault`, windowSlots(VAULT_WINDOW_MINUTES)));
@@ -231,14 +232,14 @@ export function scanPlans(config: Config, targets: WatchTargets): ScanPlan[] {
             });
         }
         const privileged = config.programs.find((p) => p.id === program.id)?.privilegedInstructions ?? [];
-        for (const key of privileged.length > 0 ? program.adminKeys : []) {
+        for (const key of program.adminKeys) {
             plans.push({
                 key: `adminkey:${program.id}:${key}`,
                 label: `${program.label} admin ${short(key)}`,
                 address: key,
                 match: { programs: [{ programId: program.id, scope: 'transaction' }] },
                 status: 'any',
-                detectors: ['privileged-instruction', 'attack-chain'],
+                detectors: [...(privileged.length > 0 ? ['privileged-instruction'] : []), 'admin-key-behavior', 'attack-chain'],
                 subject: program.id,
             });
         }
@@ -340,6 +341,9 @@ export function subscriptions(config: Config, targets: WatchTargets): Subscripti
     for (const program of config.programs) {
         for (const instructionNames of chunk(program.privilegedInstructions, STREAM_MAX_INSTRUCTION_NAMES)) {
             subs.push({ label: `admin:${program.id}`, filter: { programs: [program.id], instructionNames, includeFailed: true } });
+        }
+        for (const include of chunk(targets.programs.get(program.id)?.adminKeys ?? [], STREAM_MAX_INCLUDED_ACCOUNTS)) {
+            subs.push({ label: `adminkeys:${program.id}`, filter: { programs: [program.id], accounts: { include } } });
         }
     }
     for (const include of chunk([...targets.multisigs.keys()], STREAM_MAX_INCLUDED_ACCOUNTS)) {

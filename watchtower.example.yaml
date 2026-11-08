@@ -7,6 +7,10 @@ programs:
     # Instructions only an admin should call. Every call alerts; a signer not seen before escalates to high.
     # Names follow the program's IDL; snake_case and camelCase both match.
     privilegedInstructions: []
+    # Admin keys to watch in addition to the ones discovered from the IDL. Needed for programs without
+    # an IDL, such as native programs. Each key's history is profiled, and a call that departs from it
+    # (a new instruction, fee payer, co-signer or program, or a flash loan) alerts.
+    adminKeys: []
     # Find the addresses that pay out this program's funds (priced with Helius DAS) and alert when
     # 20% of a holding leaves at once. For programs that hold user funds (lending, perps); an
     # aggregator's PDAs route funds on every swap, so leave it off for those.

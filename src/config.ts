@@ -42,6 +42,8 @@ const configSchema = z.object({
                 name: z.string().optional(),
                 /** Matched case- and separator-insensitively. */
                 privilegedInstructions: z.array(z.string()).default([]),
+                /** Admin keys to watch in addition to discovered ones, for programs whose IDL doesn't reveal them. */
+                adminKeys: z.array(pubkey).default([]),
                 /** Discover the program's vaults from its token payouts and alert on fast drains. */
                 watchVaults: z.boolean().default(false),
             }),
