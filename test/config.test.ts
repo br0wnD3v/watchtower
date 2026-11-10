@@ -3,6 +3,7 @@ import { deflateSync } from 'node:zlib';
 import { address, getAddressEncoder } from '@solana/kit';
 import { describe, expect, it } from 'vitest';
 import { checkConfigChanges } from '../src/configWatch.js';
+import { PROGRAMS } from '../src/constants.js';
 import type { ParsedTransactionResult } from 'helius-sdk/parsedEvents/types';
 import { namesType, summarizeIdl, type ConfigLayout } from '../src/discover/idl.js';
 import { decodeConfig, discoverAdmins, discoverConfigAccounts, fetchIdl, type ConfigAccount } from '../src/discover/index.js';
@@ -275,8 +276,12 @@ describe('config-change', () => {
 });
 
 describe('discoverAdmins', () => {
-    it('drops a past signer of a role the config account now gives to another key', async () => {
-        const config: ConfigAccount = { address: KEYS.configTx, layout: state, values: { admin: ADMIN } };
+    const pump = summarizeIdl(JSON.parse(readFileSync(new URL('./fixtures/idl-pump-amm.json', import.meta.url), 'utf8')));
+    const globalConfig = pump.configLayouts.find((l) => l.account === 'GlobalConfig')!;
+
+    /** Admin keys when the config account's `admin` is `admin`, `KEYS.member` signed as admin, and an earlier run kept `COUNCIL`. */
+    async function adminKeys(layout: ConfigLayout, admin: string): Promise<string[]> {
+        const config: ConfigAccount = { address: KEYS.configTx, layout, values: { admin } };
         const call = swapOn(KEYS.program);
         Object.assign(call.parsed!.instructions[0]!, {
             instructionName: 'update_admin',
@@ -290,6 +295,23 @@ describe('discoverAdmins', () => {
             ['update_admin'],
             new Map([[COUNCIL, 'admin']]),
         );
-        expect(admins.map((a) => a.key)).toEqual([ADMIN]);
+        return admins.map((a) => a.key);
+    }
+
+    it('drops past signers of a role the config account at a constant-seed PDA now gives to another key', async () => {
+        expect(await adminKeys(globalConfig, ADMIN)).toEqual([ADMIN]);
+    });
+
+    it('drops past signers of a renounced role', async () => {
+        expect(await adminKeys(globalConfig, PROGRAMS.system)).toEqual([]);
+    });
+
+    it('keeps the signers when the config account’s admin key is dropped as an unknown PDA', async () => {
+        expect(await adminKeys(globalConfig, PUMP_AMM_GLOBAL_CONFIG)).toEqual([KEYS.member, COUNCIL]);
+    });
+
+    it('keeps the signers when the config type can have accounts discovery did not find', async () => {
+        expect(await adminKeys(state, ADMIN)).toEqual([ADMIN, KEYS.member, COUNCIL]);
+        expect(await adminKeys({ ...globalConfig, perEntity: true }, ADMIN)).toEqual([ADMIN, KEYS.member, COUNCIL]);
     });
 });

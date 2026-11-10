@@ -322,19 +322,17 @@ export async function discoverAdmins(
     // Insertion order is priority: the current admins in config accounts, then recent signers, then keys from earlier runs.
     const roles = new Map<string, string>();
     const fromAccounts = new Set<string>();
-    const configRoles = new Set<string>();
+    const singleAccountRoles: [key: string, role: string][] = [];
     for (const config of configAccounts) {
+        const single = config.layout.pdas.length > 0 && !config.layout.perEntity;
         for (const field of config.layout.fields.filter((f) => f.admin)) {
             const key = config.values[field.name];
-            if (!key || key === PROGRAMS.system) continue;
-            configRoles.add(normalizeName(field.name));
-            if (roles.has(key)) continue;
+            if (key && single) singleAccountRoles.push([key, roleName(field.name)]);
+            if (!key || key === PROGRAMS.system || roles.has(key)) continue;
             roles.set(key, `${config.layout.account}.${field.name}`);
             fromAccounts.add(key);
         }
     }
-    const replaced = (key: string, role: string) =>
-        !fromAccounts.has(key) && configRoles.has(normalizeName(role.slice(role.lastIndexOf('.') + 1)));
     if (privilegedInstructions.length > 0) {
         const scan = events.scanAll(
             {
@@ -351,13 +349,13 @@ export async function discoverAdmins(
             for (const ix of fromParsedEvents(result)?.instructions ?? []) {
                 if (ix.programId !== programId) continue;
                 for (const signer of ix.accounts?.filter((a) => a.isSigner && isAdminRole(a.name)) ?? []) {
-                    if (!roles.has(signer.pubkey) && !replaced(signer.pubkey, signer.name)) roles.set(signer.pubkey, signer.name);
+                    if (!roles.has(signer.pubkey)) roles.set(signer.pubkey, signer.name);
                 }
             }
             if (++matched >= ADMIN_SCAN_MATCHES) break;
         }
     }
-    for (const [key, role] of known) if (!roles.has(key) && !replaced(key, role)) roles.set(key, role);
+    for (const [key, role] of known) if (!roles.has(key)) roles.set(key, role);
     const admins = await Promise.all(
         [...roles].slice(0, MAX_ADMIN_KEYS * 2).map(async ([key, role]): Promise<AdminAuthority> => {
             if (!isOffCurveAddress(address(key))) return { key, role, kind: 'wallet', multisig: null };
@@ -365,7 +363,15 @@ export async function discoverAdmins(
             return { key, role, kind: multisig ? 'squads' : 'unknown-pda', multisig };
         }),
     );
-    return admins.filter((a) => !(fromAccounts.has(a.key) && a.kind === 'unknown-pda')).slice(0, MAX_ADMIN_KEYS);
+    const kept = admins.filter((a) => !(fromAccounts.has(a.key) && a.kind === 'unknown-pda'));
+    const keptKeys = new Set(kept.map((a) => a.key));
+    const heldRoles = new Set(singleAccountRoles.filter(([key]) => key === PROGRAMS.system || keptKeys.has(key)).map(([, role]) => role));
+    return kept.filter((a) => fromAccounts.has(a.key) || !heldRoles.has(roleName(a.role))).slice(0, MAX_ADMIN_KEYS);
+}
+
+/** The field or signer name of a role, without the `Account.` prefix of a key read from a config account. */
+function roleName(role: string): string {
+    return normalizeName(role.slice(role.lastIndexOf('.') + 1));
 }
 
 const VAULT_SCAN_BUDGET = 3_000;
