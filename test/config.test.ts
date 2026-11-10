@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { checkConfigChanges } from '../src/configWatch.js';
 import type { ParsedTransactionResult } from 'helius-sdk/parsedEvents/types';
 import { namesType, summarizeIdl, type ConfigLayout } from '../src/discover/idl.js';
-import { decodeConfig, discoverConfigAccounts, fetchIdl, type ConfigAccount } from '../src/discover/index.js';
+import { decodeConfig, discoverAdmins, discoverConfigAccounts, fetchIdl, type ConfigAccount } from '../src/discover/index.js';
 import { Engine } from '../src/engine.js';
 import type { ParsedEventsClient } from '../src/helius/parsedEvents.js';
 import type { RpcClient } from '../src/helius/rpc.js';
@@ -271,5 +271,25 @@ describe('config-change', () => {
         current = stateData(COUNCIL, { exchangeStatus: 1, numberOfSubAccounts: 2 });
         await checkConfigChanges(runtime, 'silent');
         expect(runtime.state.findings()[0]).toMatchObject({ severity: 'high', title: 'State settings changed', stages: ['risk'] });
+    });
+});
+
+describe('discoverAdmins', () => {
+    it('drops a past signer of a role the config account now gives to another key', async () => {
+        const config: ConfigAccount = { address: KEYS.configTx, layout: state, values: { admin: ADMIN } };
+        const call = swapOn(KEYS.program);
+        Object.assign(call.parsed!.instructions[0]!, {
+            instructionName: 'update_admin',
+            decoded: { args: {}, accounts: [{ name: 'admin', pubkey: KEYS.member, isSigner: true, isWritable: false }] },
+        });
+        const admins = await discoverAdmins(
+            {} as RpcClient,
+            sampledEvents([call]),
+            KEYS.program,
+            [config],
+            ['update_admin'],
+            new Map([[COUNCIL, 'admin']]),
+        );
+        expect(admins.map((a) => a.key)).toEqual([ADMIN]);
     });
 });

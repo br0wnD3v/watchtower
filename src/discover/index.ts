@@ -3,7 +3,7 @@ import { address, createAddressWithSeed, getAddressDecoder, getProgramDerivedAdd
 import { PROGRAMS, SQUADS_PROGRAMS } from '../constants.js';
 import type { ParsedEventsClient } from '../helius/parsedEvents.js';
 import type { FungibleHolding, RpcClient } from '../helius/rpc.js';
-import { account, fromParsedEvents } from '../model.js';
+import { account, fromParsedEvents, normalizeName } from '../model.js';
 import { checkBuild, type BuildCheck } from './build.js';
 import { isAdminRole, namesType, PRIMITIVE_SIZE, summarizeIdl, type ConfigLayout, type IdlSummary } from './idl.js';
 import { mintControls, type MintControl } from './token2022.js';
@@ -322,14 +322,19 @@ export async function discoverAdmins(
     // Insertion order is priority: the current admins in config accounts, then recent signers, then keys from earlier runs.
     const roles = new Map<string, string>();
     const fromAccounts = new Set<string>();
+    const configRoles = new Set<string>();
     for (const config of configAccounts) {
         for (const field of config.layout.fields.filter((f) => f.admin)) {
             const key = config.values[field.name];
-            if (!key || key === PROGRAMS.system || roles.has(key)) continue;
+            if (!key || key === PROGRAMS.system) continue;
+            configRoles.add(normalizeName(field.name));
+            if (roles.has(key)) continue;
             roles.set(key, `${config.layout.account}.${field.name}`);
             fromAccounts.add(key);
         }
     }
+    const replaced = (key: string, role: string) =>
+        !fromAccounts.has(key) && configRoles.has(normalizeName(role.slice(role.lastIndexOf('.') + 1)));
     if (privilegedInstructions.length > 0) {
         const scan = events.scanAll(
             {
@@ -346,13 +351,13 @@ export async function discoverAdmins(
             for (const ix of fromParsedEvents(result)?.instructions ?? []) {
                 if (ix.programId !== programId) continue;
                 for (const signer of ix.accounts?.filter((a) => a.isSigner && isAdminRole(a.name)) ?? []) {
-                    if (!roles.has(signer.pubkey)) roles.set(signer.pubkey, signer.name);
+                    if (!roles.has(signer.pubkey) && !replaced(signer.pubkey, signer.name)) roles.set(signer.pubkey, signer.name);
                 }
             }
             if (++matched >= ADMIN_SCAN_MATCHES) break;
         }
     }
-    for (const [key, role] of known) if (!roles.has(key)) roles.set(key, role);
+    for (const [key, role] of known) if (!roles.has(key) && !replaced(key, role)) roles.set(key, role);
     const admins = await Promise.all(
         [...roles].slice(0, MAX_ADMIN_KEYS * 2).map(async ([key, role]): Promise<AdminAuthority> => {
             if (!isOffCurveAddress(address(key))) return { key, role, kind: 'wallet', multisig: null };
